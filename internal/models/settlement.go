@@ -13,7 +13,7 @@ type Settlement struct {
 }
 
 type Balance struct {
-	UserID int     `json:"user_id"`
-	OwedTo int     `json:"owed_to"`
-	Amount float64 `json:"amount"`
+	UserID int     `db:"user_id" json:"user_id"`
+	OwedTo int     `db:"owed_to" json:"owed_to"`
+	Amount float64 `db:"amount" json:"amount"`
 }

@@ -1,5 +1,3 @@
-// pkg/response/json.go
-
 package response
 
 import (

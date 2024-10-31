@@ -2,6 +2,8 @@ package repository
 
 import (
 	"expense-sharing-api/internal/models"
+	"fmt"
+	"log"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -105,29 +107,40 @@ func (r *ExpenseRepository) GetGroupExpenses(groupID int) ([]models.Expense, err
 
 func (r *ExpenseRepository) GetUserBalance(userID, groupID int) ([]models.Balance, error) {
 	query := `
-        WITH user_expenses AS (
+        WITH user_balances AS (
             SELECT 
-                e.expense_id,
-                e.created_by as paid_by,
-                es.user_id as owed_by,
-                es.share_amount,
-                es.paid_amount
+                es.user_id,
+                e.created_by as owed_to,
+                SUM(es.share_amount) as total_share,
+                SUM(es.paid_amount) as total_paid
             FROM expenses e
             JOIN expense_shares es ON e.expense_id = es.expense_id
             WHERE e.group_id = ?
+            GROUP BY es.user_id, e.created_by
         )
         SELECT 
-            owed_by as user_id,
-            paid_by as owed_to,
-            SUM(share_amount - paid_amount) as amount
-        FROM user_expenses
-        WHERE (owed_by = ? OR paid_by = ?)
-        GROUP BY owed_by, paid_by
-        HAVING amount > 0`
+            user_id,    -- matches Balance.UserID
+            owed_to,    -- matches Balance.OwedTo
+            (total_share - total_paid) as amount  -- matches Balance.Amount
+        FROM user_balances
+        WHERE (user_id = ? OR owed_to = ?)
+            AND (total_share - total_paid) > 0
+        ORDER BY amount DESC`
 
 	var balances []models.Balance
 	err := r.db.Select(&balances, query, groupID, userID, userID)
-	return balances, err
+	if err != nil {
+		log.Printf("Error fetching balance sheet: %v", err)
+		return nil, fmt.Errorf("error fetching balance sheet: %v", err)
+	}
+
+	// Debug logging
+	log.Printf("Found %d balance records", len(balances))
+	for _, b := range balances {
+		log.Printf("Balance: UserID=%d, OwedTo=%d, Amount=%.2f", b.UserID, b.OwedTo, b.Amount)
+	}
+
+	return balances, nil
 }
 
 func (r *ExpenseRepository) Settle(settlement *models.Settlement) error {
