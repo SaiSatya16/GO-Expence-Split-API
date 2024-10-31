@@ -64,7 +64,7 @@ go run cmd/api/main.go
 | Method | Path             | Description         |
 |--------|---------------   |---------------------|
 | POST   | /api/groups      | Create group        |
-| GET    | /api/groups      | Get user's groups   |
+| GET    | /api/groups      | Get user\'s groups  |
 | GET    | /api/groups/{id} | Get group details   |
 ```
 ### Expenses
