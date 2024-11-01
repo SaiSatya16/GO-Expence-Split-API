@@ -1,0 +1,445 @@
+openapi: 3.0.0
+info:
+  title: Expense Sharing API
+  description: API for managing shared expenses between groups of users
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        full_name:
+          type: string
+          example: John Doe
+        created_at:
+          type: string
+          format: date-time
+
+    UserRegister:
+      type: object
+      required:
+        - email
+        - full_name
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        full_name:
+          type: string
+          example: John Doe
+        password:
+          type: string
+          example: password123
+          minLength: 8
+
+    UserLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          example: password123
+
+    Group:
+      type: object
+      properties:
+        group_id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Roommates
+        description:
+          type: string
+          example: Monthly apartment expenses
+        created_by:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
+    GroupCreate:
+      type: object
+      required:
+        - name
+        - members
+      properties:
+        name:
+          type: string
+          example: Roommates
+        description:
+          type: string
+          example: Monthly apartment expenses
+        members:
+          type: array
+          items:
+            type: integer
+          example: [2, 3, 4]
+
+    Expense:
+      type: object
+      properties:
+        expense_id:
+          type: integer
+          example: 1
+        group_id:
+          type: integer
+          example: 1
+        description:
+          type: string
+          example: Dinner
+        amount:
+          type: number
+          format: float
+          example: 100.50
+        created_by:
+          type: integer
+          example: 1
+        split_type:
+          type: string
+          enum: [EQUAL, EXACT, PERCENTAGE]
+        created_at:
+          type: string
+          format: date-time
+        shares:
+          type: array
+          items:
+            $ref: '#/components/schemas/Share'
+
+    ExpenseCreate:
+      type: object
+      required:
+        - group_id
+        - description
+        - amount
+        - split_type
+        - shares
+      properties:
+        group_id:
+          type: integer
+          example: 1
+        description:
+          type: string
+          example: Dinner
+        amount:
+          type: number
+          format: float
+          example: 100.50
+        split_type:
+          type: string
+          enum: [EQUAL, EXACT, PERCENTAGE]
+        shares:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShareCreate'
+
+    Share:
+      type: object
+      properties:
+        expense_id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 2
+        share_amount:
+          type: number
+          format: float
+          example: 33.50
+        share_percentage:
+          type: number
+          format: float
+          example: 33.33
+        paid_amount:
+          type: number
+          format: float
+          example: 0
+
+    ShareCreate:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+          example: 2
+        share_amount:
+          type: number
+          format: float
+          example: 33.50
+        share_percentage:
+          type: number
+          format: float
+          example: 33.33
+        paid_amount:
+          type: number
+          format: float
+          example: 0
+
+    Balance:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        owed_to:
+          type: integer
+          example: 2
+        amount:
+          type: number
+          format: float
+          example: 50.25
+
+paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /api/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+  /api/login:
+    post:
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+  /api/groups:
+    post:
+      summary: Create a new group
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupCreate'
+      responses:
+        '201':
+          description: Group created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Group'
+    
+    get:
+      summary: Get user's groups
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of user's groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Group'
+
+  /api/groups/{id}:
+    get:
+      summary: Get group by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Group details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Group'
+
+  /api/expenses:
+    post:
+      summary: Create a new expense
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCreate'
+      responses:
+        '201':
+          description: Expense created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Expense'
+
+  /api/groups/{id}/expenses:
+    get:
+      summary: Get group expenses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of group expenses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Expense'
+
+  /api/groups/{id}/balance:
+    get:
+      summary: Get group balance sheet
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Group balance sheet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Balance'
